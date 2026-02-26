@@ -86,11 +86,26 @@ function headingAlongRoute(progress) {
   const dx = ROUTE[seg+1][1] - ROUTE[seg][1];
   return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
 }
+const DEPARTURE_DATE = new Date("2026-03-31");
+const ARRIVAL_DATE = new Date("2026-06-10");
+const TOTAL_DURATION_MS = ARRIVAL_DATE - DEPARTURE_DATE;
+
 function etaDate(progress) {
-  const daysLeft = Math.round((1 - progress) * 15);
-  const d = new Date();
-  d.setDate(d.getDate() + daysLeft);
-  return d.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" });
+  const msLeft = (1 - progress) * TOTAL_DURATION_MS;
+  const eta = new Date(ARRIVAL_DATE - msLeft + msLeft); // always arrival
+  return ARRIVAL_DATE.toLocaleDateString("fr-FR", { day:"2-digit", month:"short", year:"numeric" });
+}
+
+function getProgressFromDates() {
+  const now = new Date();
+  if (now <= DEPARTURE_DATE) return 0;
+  if (now >= ARRIVAL_DATE) return 0.9999;
+  return Math.min((now - DEPARTURE_DATE) / TOTAL_DURATION_MS, 0.9999);
+}
+
+function getDaysLeft(progress) {
+  const msLeft = (1 - progress) * TOTAL_DURATION_MS;
+  return Math.max(0, Math.round(msLeft / (1000 * 60 * 60 * 24)));
 }
 
 function generateVessels() {
@@ -103,7 +118,7 @@ function generateVessels() {
     lat:sLat, lng:sLng,
     speed:14.2, heading:headingAlongRoute(0),
     from:"Halifax, Canada", to:"Abidjan, Cote d'Ivoire",
-    progress:0, status:"En route",
+    progress: getProgressFromDates(), status:"En route",
     dlat:0, dlng:0,
     cargo:"Equipements industriels",
     built:2019, length:"225m", grossTonnage:"42,500 GT",
@@ -350,7 +365,12 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
                   <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1">
                     <div className="h-full rounded-full bg-gradient-to-r from-red-600 to-red-400" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
                   </div>
-                  <div className="text-xs text-red-400">{Math.round(selected.progress*100)}% ETA {etaDate(selected.progress)}</div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    <span className="text-red-400 font-bold">{Math.round(selected.progress*100)}%</span>
+                    {" · "}Départ: <span className="text-slate-300">31 mars 2026</span>
+                    {" · "}ETA: <span className="text-red-400">10 juin 2026</span>
+                    {" · "}<span className="text-slate-400">J-{getDaysLeft(selected.progress)} restants</span>
+                  </div>
                 </div>
               )}
               <button onClick={()=>{onSelectVessel(selected.id);setActiveTab("Carte Live");}}
@@ -619,7 +639,7 @@ export default function MarineTracker() {
         return prev.map(v => {
           let u={...v};
           if (v.id==="route-001") {
-            u.progress=Math.min(v.progress+1/(15*24*3600),0.9999);
+            u.progress=Math.min(v.progress+1/(71*24*3600),0.9999);
             const [lat,lng]=posAlongRoute(u.progress);
             u.lat=lat; u.lng=lng; u.heading=headingAlongRoute(u.progress);
             u.status="En route"; // Statut forcé permanent
@@ -808,9 +828,9 @@ export default function MarineTracker() {
                       <div className="h-full rounded-full bg-gradient-to-r from-red-700 to-red-400 transition-all duration-1000" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
                     </div>
                     <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>Halifax</span><span>Abidjan</span>
+                      <span>Halifax · 31 mars</span><span>10 juin · Abidjan</span>
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-1">ETA: <span className="text-red-400">{etaDate(selected.progress)}</span></div>
+                    <div className="text-[11px] text-slate-400 mt-1">ETA: <span className="text-red-400">10 juin 2026</span> · <span className="text-slate-300">J-{getDaysLeft(selected.progress)} restants</span></div>
                   </div>
                 )}
                 <div className="flex gap-2 px-4 pb-3">
