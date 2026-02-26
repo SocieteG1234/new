@@ -25,6 +25,10 @@ const ROUTE = [
   [25.0, -25.0], [15.0, -20.0], [10.0, -15.0], [7.0, -10.0], [5.3, -4.0],
 ];
 
+// Couleur exclusive au MV Abidjan Star — rouge pur, distinct de tous les autres
+const ABIDJAN_COLOR = "#ff0000";
+const ABIDJAN_SIZE = 18; // Plus grand que les autres (13)
+
 const TYPES = {
   cargo:    { color: "#2ed573", label: "Cargo",     tailwind: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
   tanker:   { color: "#ff4757", label: "Tanker",    tailwind: "text-red-400 bg-red-400/10 border-red-400/30" },
@@ -131,11 +135,21 @@ function generateVessels() {
   return list;
 }
 
-function shipSVG(heading, color, size) {
+// SVG navire — MV Abidjan Star reçoit un halo rouge pulsant + contour blanc
+function shipSVG(heading, color, size, isAbidjan = false) {
   const s = size;
+  const halo = isAbidjan
+    ? `<circle r="${s*1.4}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.4"/>
+       <circle r="${s*1.9}" fill="none" stroke="${color}" stroke-width="0.8" opacity="0.15"/>`
+    : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${s*2}" height="${s*2}" viewBox="${-s} ${-s} ${s*2} ${s*2}">
+    ${halo}
     <g transform="rotate(${heading})">
-      <polygon points="0,${-s*0.9} ${s*0.45},${s*0.7} 0,${s*0.4} ${-s*0.45},${s*0.7}" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.8" opacity="0.95"/>
+      <polygon points="0,${-s*0.9} ${s*0.45},${s*0.7} 0,${s*0.4} ${-s*0.45},${s*0.7}"
+        fill="${color}"
+        stroke="${isAbidjan ? "#ffffff" : "rgba(0,0,0,0.35)"}"
+        stroke-width="${isAbidjan ? 1.5 : 0.8}"
+        opacity="0.97"/>
     </g>
   </svg>`;
 }
@@ -150,13 +164,18 @@ function StatCard({ value, label, color }) {
 }
 
 function VesselItem({ vessel, selected, onClick }) {
+  const isAbidjan = vessel.id === "route-001";
   const cfg = TYPES[vessel.type];
+  const dotColor = isAbidjan ? ABIDJAN_COLOR : cfg.color;
   return (
     <div onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-white/5 transition-all ${selected?"bg-cyan-400/10":"hover:bg-white/5"}`}>
-      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background:cfg.color }}/>
+      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-white/5 transition-all
+        ${selected ? (isAbidjan ? "bg-red-500/10" : "bg-cyan-400/10") : "hover:bg-white/5"}
+        ${isAbidjan ? "border-l-2" : ""}`}
+      style={isAbidjan ? { borderLeftColor: ABIDJAN_COLOR } : {}}>
+      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: dotColor }}/>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold truncate">{vessel.name}</div>
+        <div className={`text-sm font-semibold truncate ${isAbidjan ? "text-red-400" : ""}`}>{vessel.name}</div>
         <div className="text-[11px] text-slate-400 mt-0.5 truncate">{cfg.label} {vessel.flag} {vessel.to}</div>
       </div>
       <div className="text-[12px] text-slate-400 flex-shrink-0">{vessel.speed} kn</div>
@@ -232,22 +251,23 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
       </div>
 
       <div className="flex-1 overflow-hidden flex relative">
-        {/* List */}
         <div className={`flex-1 overflow-y-auto ${showDetail?"hidden md:block":""}`} style={{ scrollbarWidth:"thin" }}>
           {filtered.length===0 ? (
             <div className="flex items-center justify-center h-32 text-slate-500 text-sm">Aucun navire</div>
           ) : (
             <>
-              {/* Mobile cards */}
               <div className="md:hidden divide-y divide-white/5">
                 {filtered.map(v => {
-                  const cfg=TYPES[v.type];
+                  const isAbidjan = v.id === "route-001";
+                  const cfg = TYPES[v.type];
+                  const dotColor = isAbidjan ? ABIDJAN_COLOR : cfg.color;
                   return (
                     <div key={v.id} onClick={()=>pick(v)}
-                      className={`px-4 py-3 cursor-pointer ${selected?.id===v.id?"bg-cyan-400/8":"hover:bg-white/4"}`}>
+                      className={`px-4 py-3 cursor-pointer ${selected?.id===v.id?(isAbidjan?"bg-red-500/8":"bg-cyan-400/8"):"hover:bg-white/4"}`}
+                      style={isAbidjan ? { borderLeft:`2px solid ${ABIDJAN_COLOR}` } : {}}>
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:cfg.color }}/>
-                        <span className="font-semibold text-slate-100 text-sm flex-1 truncate">{v.name}</span>
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}/>
+                        <span className={`font-semibold text-sm flex-1 truncate ${isAbidjan ? "text-red-400" : "text-slate-100"}`}>{v.name}</span>
                         <span className="text-cyan-400 text-xs font-mono">{v.speed} kn</span>
                       </div>
                       <div className="flex items-center gap-2 pl-4 flex-wrap">
@@ -259,7 +279,6 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
                   );
                 })}
               </div>
-              {/* Desktop table */}
               <table className="hidden md:table w-full text-sm">
                 <thead className="sticky top-0 bg-slate-900/95 border-b border-cyan-400/15">
                   <tr>{["Navire","Type","Pavillon","De","Vers","Vitesse","Statut",""].map(h=>(
@@ -268,14 +287,17 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
                 </thead>
                 <tbody>
                   {filtered.map(v => {
-                    const cfg=TYPES[v.type];
+                    const isAbidjan = v.id === "route-001";
+                    const cfg = TYPES[v.type];
+                    const dotColor = isAbidjan ? ABIDJAN_COLOR : cfg.color;
                     return (
                       <tr key={v.id} onClick={()=>pick(v)}
-                        className={`border-b border-white/5 cursor-pointer ${selected?.id===v.id?"bg-cyan-400/8":"hover:bg-white/4"}`}>
+                        className={`border-b border-white/5 cursor-pointer ${selected?.id===v.id?(isAbidjan?"bg-red-500/8":"bg-cyan-400/8"):"hover:bg-white/4"}`}
+                        style={isAbidjan ? { borderLeft:`2px solid ${ABIDJAN_COLOR}` } : {}}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:cfg.color }}/>
-                            <span className="font-semibold text-slate-100">{v.name}</span>
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}/>
+                            <span className={`font-semibold ${isAbidjan ? "text-red-400" : "text-slate-100"}`}>{v.name}</span>
                           </div>
                           <div className="text-[11px] text-slate-500 pl-4">{v.mmsi}</div>
                         </td>
@@ -300,14 +322,13 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
           )}
         </div>
 
-        {/* Detail */}
         {selected && (
           <div className={`bg-slate-900/98 border-l border-cyan-400/15 overflow-y-auto md:w-72 md:flex-shrink-0
             ${showDetail?"absolute inset-0 z-10 md:relative md:inset-auto":""}`}
             style={{ scrollbarWidth:"thin" }}>
             <div className="sticky top-0 bg-slate-900/98 px-4 py-3 border-b border-cyan-400/15 flex items-center gap-2">
               <button onClick={()=>{setSelected(null);setShowDetail(false);}} className="md:hidden text-slate-400 text-sm">← Retour</button>
-              <h3 className="font-bold text-slate-100 flex-1 truncate text-sm">{selected.name}</h3>
+              <h3 className={`font-bold flex-1 truncate text-sm ${selected.id==="route-001" ? "text-red-400" : "text-slate-100"}`}>{selected.name}</h3>
               <button onClick={()=>{setSelected(null);setShowDetail(false);}} className="hidden md:block text-slate-500 hover:text-slate-300 text-sm">✕</button>
             </div>
             <div className="p-4 grid gap-4">
@@ -327,9 +348,9 @@ function ExplorerPage({ vessels, onSelectVessel, setActiveTab }) {
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1.5">Progression</div>
                   <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
+                    <div className="h-full rounded-full bg-gradient-to-r from-red-600 to-red-400" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
                   </div>
-                  <div className="text-xs text-cyan-400">{Math.round(selected.progress*100)}% ETA {etaDate(selected.progress)}</div>
+                  <div className="text-xs text-red-400">{Math.round(selected.progress*100)}% ETA {etaDate(selected.progress)}</div>
                 </div>
               )}
               <button onClick={()=>{onSelectVessel(selected.id);setActiveTab("Carte Live");}}
@@ -358,7 +379,6 @@ function FlottePage({ vessels }) {
     <div className="flex-1 overflow-y-auto bg-slate-950" style={{ scrollbarWidth:"thin" }}>
       <div className="px-4 py-5 max-w-7xl mx-auto">
         <h2 className="text-base font-bold text-emerald-400 mb-4" style={{ fontFamily:"'Rajdhani'" }}>Flotte</h2>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           {[
             { label:"Total", value:vessels.length, color:"#00d4ff", icon:"🚢" },
@@ -373,8 +393,6 @@ function FlottePage({ vessels }) {
             </div>
           ))}
         </div>
-
-        {/* Type filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{ scrollbarWidth:"none" }}>
           {[{key:"all",cfg:{color:"#00d4ff",label:"Tous"},count:vessels.length},...Object.entries(TYPES).map(([k,c])=>({key:k,cfg:c,count:vessels.filter(v=>v.type===k).length}))].map(({key,cfg,count})=>(
             <button key={key} onClick={()=>setFilter(key)}
@@ -385,7 +403,6 @@ function FlottePage({ vessels }) {
             </button>
           ))}
         </div>
-
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-slate-400">{filtered.length} navires</span>
           <div className="flex gap-2">
@@ -397,16 +414,18 @@ function FlottePage({ vessels }) {
             ))}
           </div>
         </div>
-
         {view==="grid" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map(v => {
-              const cfg=TYPES[v.type];
+              const isAbidjan = v.id === "route-001";
+              const cfg = TYPES[v.type];
               return (
-                <div key={v.id} className="bg-slate-900/50 border border-white/8 rounded-xl p-4 hover:bg-slate-800/50 transition-all">
+                <div key={v.id}
+                  className="bg-slate-900/50 border rounded-xl p-4 hover:bg-slate-800/50 transition-all"
+                  style={{ borderColor: isAbidjan ? `${ABIDJAN_COLOR}55` : "rgba(255,255,255,0.08)" }}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0 mr-2">
-                      <h3 className="font-bold text-slate-100 text-sm truncate mb-1">{v.name}</h3>
+                      <h3 className={`font-bold text-sm truncate mb-1 ${isAbidjan ? "text-red-400" : "text-slate-100"}`}>{v.name}</h3>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.tailwind}`}>{cfg.label}</span>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -433,7 +452,6 @@ function FlottePage({ vessels }) {
             })}
           </div>
         )}
-
         {view==="list" && (
           <div className="bg-slate-900/40 border border-cyan-400/10 rounded-xl overflow-hidden overflow-x-auto">
             <table className="w-full text-sm" style={{ minWidth:"480px" }}>
@@ -444,13 +462,16 @@ function FlottePage({ vessels }) {
               </thead>
               <tbody>
                 {filtered.map(v => {
-                  const cfg=TYPES[v.type];
+                  const isAbidjan = v.id === "route-001";
+                  const cfg = TYPES[v.type];
+                  const dotColor = isAbidjan ? ABIDJAN_COLOR : cfg.color;
                   return (
-                    <tr key={v.id} className="border-b border-white/5 hover:bg-white/4">
+                    <tr key={v.id} className="border-b border-white/5 hover:bg-white/4"
+                      style={isAbidjan ? { borderLeft:`2px solid ${ABIDJAN_COLOR}` } : {}}>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:cfg.color }}/>
-                          <span className="font-semibold text-slate-100 text-xs truncate max-w-28">{v.name}</span>
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}/>
+                          <span className={`font-semibold text-xs truncate max-w-28 ${isAbidjan ? "text-red-400" : "text-slate-100"}`}>{v.name}</span>
                         </div>
                       </td>
                       <td className="px-3 py-3"><span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${cfg.tailwind}`}>{cfg.label}</span></td>
@@ -480,7 +501,6 @@ function PortsPage() {
     <div className="flex-1 overflow-y-auto bg-slate-950" style={{ scrollbarWidth:"thin" }}>
       <div className="px-4 py-5 max-w-7xl mx-auto">
         <h2 className="text-base font-bold text-violet-400 mb-4" style={{ fontFamily:"'Rajdhani'" }}>Ports</h2>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           {[
             { label:"Ports", value:PORTS.length, color:"#a29bfe", icon:"🏛️" },
@@ -495,7 +515,6 @@ function PortsPage() {
             </div>
           ))}
         </div>
-
         <div className="relative mb-4">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -503,7 +522,6 @@ function PortsPage() {
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Chercher un port..."
             className="w-full bg-slate-800/60 border border-violet-400/20 rounded-lg text-sm text-slate-100 placeholder-slate-500 pl-9 pr-3 py-2 outline-none focus:border-violet-400/60"/>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(port=>(
             <div key={port.id} onClick={()=>setSelected(selected?.id===port.id?null:port)}
@@ -569,7 +587,8 @@ export default function MarineTracker() {
       const la=e.latlng.lat, lo=e.latlng.lng;
       setCoords(`${Math.abs(la).toFixed(3)}${la>=0?"N":"S"} ${Math.abs(lo).toFixed(3)}${lo>=0?"E":"W"}`);
     });
-    L.polyline(ROUTE, { color:"#ffd700", weight:2, opacity:0.5, dashArray:"8,6" }).addTo(map);
+    // Tracé de route en rouge pour MV Abidjan Star
+    L.polyline(ROUTE, { color: ABIDJAN_COLOR, weight:2.5, opacity:0.55, dashArray:"8,6" }).addTo(map);
     const pi = c => L.divIcon({ html:`<div style="width:10px;height:10px;background:${c};border:2px solid #fff;border-radius:2px;transform:rotate(45deg)"></div>`, className:"", iconSize:[10,10], iconAnchor:[5,5] });
     L.marker([44.6,-63.6],{icon:pi("#00d4ff")}).addTo(map).bindTooltip("Halifax",{direction:"top"});
     L.marker([5.3,-4.0],{icon:pi("#ffd700")}).addTo(map).bindTooltip("Abidjan",{direction:"top"});
@@ -579,8 +598,15 @@ export default function MarineTracker() {
   });
 
   function addMarker(L, map, v) {
-    const cfg=TYPES[v.type], size=13;
-    const icon = L.divIcon({ html:shipSVG(v.heading,cfg.color,size), className:"cursor-pointer", iconSize:[size*2,size*2], iconAnchor:[size,size] });
+    const isAbidjan = v.id === "route-001";
+    const color = isAbidjan ? ABIDJAN_COLOR : TYPES[v.type].color;
+    const size = isAbidjan ? ABIDJAN_SIZE : 13;
+    const icon = L.divIcon({
+      html: shipSVG(v.heading, color, size, isAbidjan),
+      className: "cursor-pointer",
+      iconSize: [size*2, size*2],
+      iconAnchor: [size, size]
+    });
     const m = L.marker([v.lat,v.lng],{icon}).addTo(map);
     m.on("click", ()=>setSelectedId(v.id));
     markersRef.current[v.id] = m;
@@ -596,6 +622,7 @@ export default function MarineTracker() {
             u.progress=Math.min(v.progress+1/(15*24*3600),0.9999);
             const [lat,lng]=posAlongRoute(u.progress);
             u.lat=lat; u.lng=lng; u.heading=headingAlongRoute(u.progress);
+            u.status="En route"; // Statut forcé permanent
           } else {
             u.lat+=v.dlat; u.lng+=v.dlng;
             u.heading=(v.heading+(Math.random()-0.5)*2+360)%360;
@@ -604,8 +631,15 @@ export default function MarineTracker() {
           }
           if(L && markersRef.current[v.id]) {
             markersRef.current[v.id].setLatLng([u.lat,u.lng]);
-            const cfg=TYPES[u.type],size=13;
-            markersRef.current[v.id].setIcon(L.divIcon({ html:shipSVG(u.heading,cfg.color,size), className:"cursor-pointer", iconSize:[size*2,size*2], iconAnchor:[size,size] }));
+            const isAbidjan = v.id === "route-001";
+            const color = isAbidjan ? ABIDJAN_COLOR : TYPES[u.type].color;
+            const size = isAbidjan ? ABIDJAN_SIZE : 13;
+            markersRef.current[v.id].setIcon(L.divIcon({
+              html: shipSVG(u.heading, color, size, isAbidjan),
+              className: "cursor-pointer",
+              iconSize: [size*2, size*2],
+              iconAnchor: [size, size]
+            }));
           }
           return u;
         });
@@ -640,7 +674,6 @@ export default function MarineTracker() {
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden" style={{ fontFamily:"'Exo 2',sans-serif" }}>
 
-      {/* TOPBAR */}
       <header className="flex-shrink-0 flex items-center gap-2 px-3 bg-slate-900 border-b border-cyan-400/20 z-50" style={{height:"52px"}}>
         <div className="flex items-center gap-1.5 text-cyan-400 font-bold flex-shrink-0" style={{ fontFamily:"'Rajdhani'", fontSize:"18px" }}>
           <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
@@ -650,8 +683,6 @@ export default function MarineTracker() {
           </svg>
           <span className="hidden sm:inline">OceanTrack</span>
         </div>
-
-        {/* Desktop nav */}
         <nav className="hidden md:flex gap-1 ml-2">
           {TABS.map(n=>(
             <button key={n} onClick={()=>setActiveTab(n)}
@@ -660,8 +691,6 @@ export default function MarineTracker() {
             </button>
           ))}
         </nav>
-
-        {/* Mobile dropdown nav */}
         <div className="md:hidden relative ml-1">
           <button onClick={()=>setMobileMenuOpen(o=>!o)}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium bg-white/5 border border-white/10 text-slate-300">
@@ -678,13 +707,9 @@ export default function MarineTracker() {
             </div>
           )}
         </div>
-
-        {/* Live */}
         <div className="hidden sm:flex items-center gap-1.5 ml-1 text-emerald-400 text-xs font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>EN DIRECT
         </div>
-
-        {/* Search */}
         <div className="ml-auto relative" onBlur={()=>setTimeout(()=>setShowResults(false),150)}>
           <div className="relative flex items-center">
             <svg className="absolute left-2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -695,30 +720,35 @@ export default function MarineTracker() {
           </div>
           {showResults && searchResults.length>0 && (
             <div className="absolute top-full mt-1 right-0 w-52 bg-slate-900 border border-cyan-400/20 rounded-lg z-50 shadow-xl overflow-hidden">
-              {searchResults.map(v=>(
-                <div key={v.id} onMouseDown={()=>selectFromSearch(v)}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-cyan-400/10 cursor-pointer border-b border-white/5 last:border-0">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:TYPES[v.type].color }}/>
-                  <span className="flex-1 truncate text-xs">{v.name}</span>
-                  <span className="text-slate-500 text-[10px]">{TYPES[v.type].label}</span>
-                </div>
-              ))}
+              {searchResults.map(v=>{
+                const isAbidjan = v.id === "route-001";
+                const dotColor = isAbidjan ? ABIDJAN_COLOR : TYPES[v.type].color;
+                return (
+                  <div key={v.id} onMouseDown={()=>selectFromSearch(v)}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-cyan-400/10 cursor-pointer border-b border-white/5 last:border-0">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}/>
+                    <span className={`flex-1 truncate text-xs ${isAbidjan ? "text-red-400" : ""}`}>{v.name}</span>
+                    <span className="text-slate-500 text-[10px]">{TYPES[v.type].label}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </header>
 
-      {/* CONTENT */}
       <div className="flex flex-1 overflow-hidden relative">
-
-        {/* MAP */}
         <div className={`flex flex-1 overflow-hidden ${activeTab==="Carte Live"?"":"hidden"}`}>
           <div className="flex-1 relative z-10">
             <div ref={mapRef} className="w-full h-full" style={{ filter:"hue-rotate(195deg) saturate(0.8) brightness(0.88)" }}/>
             {coords && <div className="hidden sm:block absolute top-3 left-3 z-40 bg-slate-950/90 border border-cyan-400/20 rounded-md px-2.5 py-1 text-xs text-slate-400 pointer-events-none" style={{ fontFamily:"'Share Tech Mono'" }}>{coords}</div>}
 
-            {/* Legend */}
+            {/* Légende avec MV Abidjan Star en tête */}
             <div className="absolute bottom-8 left-2 z-40 bg-slate-950/90 border border-cyan-400/20 rounded-lg p-2">
+              <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-white/10">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: ABIDJAN_COLOR }}/>
+                <span className="text-[10px] text-red-400 font-bold hidden sm:inline">MV Abidjan Star</span>
+              </div>
               {Object.entries(TYPES).map(([,cfg])=>(
                 <div key={cfg.label} className="flex items-center gap-1.5 mb-1 last:mb-0">
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background:cfg.color }}/>
@@ -754,8 +784,8 @@ export default function MarineTracker() {
 
             {selected && (
               <div className="border-b border-cyan-400/15">
-                <div className="px-4 pt-3 pb-2 bg-gradient-to-br from-cyan-400/5 to-transparent">
-                  <h2 className="font-bold text-sm truncate mb-1" style={{ fontFamily:"'Rajdhani'" }}>{selected.name}</h2>
+                <div className={`px-4 pt-3 pb-2 ${selected.id==="route-001" ? "bg-gradient-to-br from-red-600/10 to-transparent" : "bg-gradient-to-br from-cyan-400/5 to-transparent"}`}>
+                  <h2 className={`font-bold text-sm truncate mb-1 ${selected.id==="route-001" ? "text-red-400" : ""}`} style={{ fontFamily:"'Rajdhani'" }}>{selected.name}</h2>
                   <span className={`text-[11px] px-2 py-0.5 rounded-full border ${TYPES[selected.type].tailwind}`}>{TYPES[selected.type].label}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 px-4 py-3">
@@ -772,15 +802,15 @@ export default function MarineTracker() {
                   <div className="px-4 pb-3">
                     <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
                       <span>Progression</span>
-                      <span className="text-cyan-400 font-bold">{Math.round(selected.progress*100)}%</span>
+                      <span className="text-red-400 font-bold">{Math.round(selected.progress*100)}%</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-2">
-                      <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-1000" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
+                      <div className="h-full rounded-full bg-gradient-to-r from-red-700 to-red-400 transition-all duration-1000" style={{ width:`${Math.round(selected.progress*100)}%` }}/>
                     </div>
                     <div className="flex justify-between text-[11px] text-slate-400">
                       <span>Halifax</span><span>Abidjan</span>
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-1">ETA: <span className="text-cyan-400">{etaDate(selected.progress)}</span></div>
+                    <div className="text-[11px] text-slate-400 mt-1">ETA: <span className="text-red-400">{etaDate(selected.progress)}</span></div>
                   </div>
                 )}
                 <div className="flex gap-2 px-4 pb-3">
